@@ -47,6 +47,7 @@ fn post(form: Form<Message>, queue: &State<Sender<Message>>) {
     let _res = queue.send(form.into_inner());
 }
 #[launch]
+
 fn rocket() -> _ {
     rocket::build()
         .manage(channel::<Message>(1024).0)
