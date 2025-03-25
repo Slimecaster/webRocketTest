@@ -51,7 +51,7 @@ fn post(form: Form<Message>, queue: &State<Sender<Message>>) {
 /// Background thread to read from Micro:bit
 fn start_microbit_reader(queue: Sender<Message>) {
     thread::spawn(move || {
-        let mut port = SerialPort::open("/dev/ttyACM0", 115200).expect("Failed to open serial port"); // Change for Windows: COMx
+        let port = SerialPort::open("COM4", 115200).expect("Failed to open serial port"); // Change for Windows: COMx
         let mut buffer = [0; 64];
 
         loop {
@@ -63,6 +63,7 @@ fn start_microbit_reader(queue: Sender<Message>) {
                         username: "Micro:bit".to_string(),
                         message: received,
                     };
+                    println!("{:?}", msg);
                     let _ = queue.send(msg);
                 }
             }
