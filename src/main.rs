@@ -5,11 +5,14 @@ use rocket::fs::{relative, FileServer};
 use rocket::form::Form;
 use rocket::response::stream::{EventStream, Event};
 use rocket::serde::{Serialize, Deserialize};
-use rocket::tokio::sync::broadcast::{channel, Sender, error::RecvError};
+use rocket::tokio::{self, sync::broadcast::{channel, Sender, error::RecvError}};
 use rocket::tokio::select;
+use serial2::SerialPort;
+use std::thread;
+use std::time::Duration;
 
+/// Message structure (now supports Micro:bit messages)
 #[derive(Debug, Clone, FromForm, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, UriDisplayQuery))]
 #[serde(crate = "rocket::serde")]
 struct Message {
     #[field(validate = len(..30))]
@@ -19,8 +22,7 @@ struct Message {
     pub message: String,
 }
 
-/// Returns an infinite stream of server-sent events. Each event is a message
-/// pulled from a broadcast queue sent by the `post` handler.
+/// Stream events to clients
 #[get("/events")]
 async fn events(queue: &State<Sender<Message>>, mut end: Shutdown) -> EventStream![] {
     let mut rx = queue.subscribe();
@@ -40,22 +42,43 @@ async fn events(queue: &State<Sender<Message>>, mut end: Shutdown) -> EventStrea
     }
 }
 
-/// Receive a message from a form submission and broadcast it to any receivers.
+/// Receive a chat message
 #[post("/message", data = "<form>")]
 fn post(form: Form<Message>, queue: &State<Sender<Message>>) {
-    // A send 'fails' if there are no active subscribers. That's okay.
     let _res = queue.send(form.into_inner());
 }
-#[launch]
 
+/// Background thread to read from Micro:bit
+fn start_microbit_reader(queue: Sender<Message>) {
+    thread::spawn(move || {
+        let mut port = SerialPort::open("/dev/ttyACM0", 115200).expect("Failed to open serial port"); // Change for Windows: COMx
+        let mut buffer = [0; 64];
+
+        loop {
+            if let Ok(n) = port.read(&mut buffer) {
+                let received = String::from_utf8_lossy(&buffer[..n]).trim().to_string();
+                if !received.is_empty() {
+                    let msg = Message {
+                        room: "Micro:bit".to_string(),
+                        username: "Micro:bit".to_string(),
+                        message: received,
+                    };
+                    let _ = queue.send(msg);
+                }
+            }
+            thread::sleep(Duration::from_millis(500)); // Avoid excessive polling
+        }
+    });
+}
+
+#[launch]
 fn rocket() -> _ {
+    let (tx, _) = channel::<Message>(1024);
+
+    start_microbit_reader(tx.clone()); // Start the Micro:bit reader
+
     rocket::build()
-        .manage(channel::<Message>(1024).0)
+        .manage(tx)
         .mount("/", routes![post, events])
         .mount("/", FileServer::from(relative!("static")))
-        .configure(rocket::Config {
-            address: "0.0.0.0".parse().unwrap(),
-            port: 8000, // Use any port you prefer
-            ..rocket::Config::default()
-        })
 }

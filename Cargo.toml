@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-
 rocket = { version = "0.5.1", features = ["json"] }
+serial2 = "0.2"  # Add serial2 for handling serial communication
+tokio = { version = "1", features = ["full"] } # Required for async operations

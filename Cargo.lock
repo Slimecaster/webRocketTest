@@ -1039,6 +1039,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serial2"
+version = "0.2.28"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8cd0c773455b60177d1abe4c739cbfa316c4f2f0ef37465befcb72e8a15cdd02"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "sharded-slab"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1186,6 +1197,7 @@ dependencies = [
  "bytes",
  "libc",
  "mio",
+ "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
  "socket2",
@@ -1407,6 +1419,8 @@ name = "webRocketTest"
 version = "0.1.0"
 dependencies = [
  "rocket",
+ "serial2",
+ "tokio",
 ]
 
 [[package]]
