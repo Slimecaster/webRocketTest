@@ -1,5 +1,6 @@
 #[macro_use] extern crate rocket;
 
+use std::sync::{Arc, Mutex};
 use rocket::{State, Shutdown};
 use rocket::fs::{relative, FileServer};
 use rocket::form::Form;
@@ -10,7 +11,6 @@ use rocket::tokio::select;
 use serial2::SerialPort;
 use std::thread;
 use std::time::Duration;
-use std::sync::{Arc, Mutex};
 
 /// Message structure (now supports Micro:bit messages)
 #[derive(Debug, Clone, FromForm, Serialize, Deserialize)]
@@ -71,11 +71,12 @@ fn start_microbit_reader(queue: Sender<Message>, port: Arc<Mutex<SerialPort>>) {
                             username: "Micro:bit".to_string(),
                             message: received,
                         };
+                        println!("{:?}", msg);
                         let _ = queue.send(msg);
                     }
                 }
             }
-            thread::sleep(Duration::from_millis(500)); // Avoid excessive polling
+            thread::sleep(Duration::from_millis(1000)); // Avoid excessive polling
         }
     });
 }
@@ -91,9 +92,13 @@ fn rocket() -> _ {
 
     start_microbit_reader(tx.clone(), serial_port.clone()); // Start the Micro:bit reader
 
-    rocket::build()
+    rocket::custom(rocket::Config {
+        address: "0.0.0.0".parse().unwrap(),
+        port: 8000, // Adjust if necessary
+        ..rocket::Config::default()
+    })
         .manage(tx)
-        .manage(serial_port)
+        .manage(serial_port) // Properly manage the serial port
         .mount("/", routes![post, events])
         .mount("/", FileServer::from(relative!("static")))
 }
